@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mine Equipment Health Monitor</title>
+  <style>
+    /* ===== 1. Tokens and base ===== */
+    :root {
+      --ink: #1E272C; --slate: #2E3A40; --steel: #5B6B73; --line: #D3D9DC;
+      --canvas: #EEF1F2; --panel: #FFFFFF; --amber: #F2A900; --accent: #1F5F8B;
+      --zone-a: #1B5E20; --zone-b: #7CB342; --zone-c: #E08A00; --zone-d: #B71C1C;
+      --heading: "Bahnschrift SemiCondensed", "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
+      --body: "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: Consolas, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font: 16px/1.55 var(--body); }
+    h1, h2, h3 { font-family: var(--heading); line-height: 1.12; margin: 0 0 12px; font-weight: 600; }
+    h1 { font-size: 56px; }
+    h2 { font-size: 30px; }
+    h3 { font-size: 20px; margin-top: 24px; }
+    p, li { max-width: 68ch; }
+    small { font-size: 13px; color: var(--steel); }
+    img { max-width: 100%; display: block; }
+    .mono { font-family: var(--mono); letter-spacing: 0.02em; }
+    .muted { color: var(--steel); }
+
+    /* ===== 2. Links, focus, buttons ===== */
+    a:link { color: var(--accent); }
+    a:visited { color: #5A4E8C; }
+    a:hover { color: var(--ink); }
+    a:active { color: #000000; }
+    a:focus, button:focus, input:focus, select:focus, textarea:focus, summary:focus { outline: 3px solid var(--accent); outline-offset: 2px; }
+    button { font: inherit; cursor: pointer; }
+
+    /* ===== 3. Header ===== */
+    .site-header { position: sticky; top: 0; z-index: 20; background: var(--ink); color: #FFFFFF; }
+    .site-header::after { content: ""; display: block; height: 5px; background: repeating-linear-gradient(45deg, var(--amber) 0 12px, var(--ink) 12px 24px); }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 0; font-family: var(--heading); font-size: 19px; font-weight: 600; }
+    .brand-mark { width: 30px; height: 30px; }
+    .site-nav ul { display: flex; gap: 4px 22px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
+    .site-nav a { display: inline-block; padding: 12px 0; color: #D5DCDF; text-decoration: none; transition: color 0.2s; }
+    .site-nav a:hover { color: var(--amber); }
+    .site-header a:focus { outline-color: var(--amber); }
+    .clock { font-family: var(--mono); font-size: 14px; color: #AEB9BE; }
+
+    /* ===== 4. Layout and reveal ===== */
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+    main > section { scroll-margin-top: 80px; padding: 64px 0 0; }
+    .section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+    .section-head p { margin: 0; color: var(--steel); }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 28px; }
+    .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.is-visible { opacity: 1; transform: none; }
+
+    /* ===== 5. Hero ===== */
+    .hero { position: relative; color: #FFFFFF; background: var(--slate); overflow: hidden; }
+    .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: grayscale(60%) contrast(1.55) brightness(30%); }
+    .hero::before { content: ""; position: absolute; inset: 0; z-index: 1; background: rgba(20, 27, 31, 0.78); }
+    .hero-content { position: relative; z-index: 2; padding: 88px 0 40px; }
+    .hero h1 { max-width: 18ch; }
+    .hero p { color: #DCE3E6; font-size: 18px; }
+    .site-facts { border-left: 4px solid var(--amber); padding-left: 16px; font-size: 15px; }
+    .stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
+    .stat { flex: 1 1 200px; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; padding: 16px 18px; }
+    .stat b { display: block; font-family: var(--heading); font-size: 44px; line-height: 1; }
+    .stat span { font-size: 14px; color: #C6D0D4; }
+    .stat.alert b { color: #FFB347; }
+    .stat.danger b { color: #FF7B7B; }
+
+    /* ===== 6. Alarm banner ===== */
+    .alarm { display: none; align-items: center; gap: 14px; margin-top: 24px; padding: 14px 18px; background: #FDECEC; border: 1px solid #F1B8B8; border-left: 6px solid var(--zone-d); border-radius: 6px; }
+    .alarm.is-active { display: flex; }
+    .alarm p { margin: 0; }
+    .alarm a { margin-left: auto; font-weight: 600; white-space: nowrap; }
+
+    /* ===== 7. Zone badges (shape and letter, never colour alone) ===== */
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 4px; font-weight: 700; font-size: 13px; background: #EEF1F2; color: var(--ink); }
+    .badge::before { content: ""; width: 11px; height: 11px; background: currentColor; }
+    .zone-a { color: var(--zone-a); } .zone-a::before, .zone-b::before { border-radius: 50%; }
+    .zone-b { color: #3E6B12; }
+    .zone-c { color: #8A4F00; background: #FFF1DB; }
+    .zone-c::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+    .zone-d { color: #FFFFFF; background: var(--zone-d); }
+    .zone-d::before { clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
+
+    /* ===== 8. Asset cards and filter ===== */
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { min-height: 40px; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); transition: background-color 0.2s, border-color 0.2s; }
+    .chip:hover { border-color: var(--steel); }
+    .chip.is-active { background: var(--ink); border-color: var(--ink); color: #FFFFFF; }
+    .asset-grid { display: flex; flex-wrap: wrap; gap: 18px; }
+    .card { flex: 1 1 320px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; text-align: left; padding: 0; color: inherit; transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s; }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(30, 39, 44, 0.12); }
+    .card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+    .card.is-danger { border-color: #F1B8B8; }
+    .card-photo { height: 160px; overflow: hidden; background: var(--slate); }
+    .card-photo img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(35%); transition: transform 0.5s; }
+    .card:hover .card-photo img { transform: scale(1.05); }
+    .card-body { padding: 16px 18px 18px; }
+    .card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .card-name { font-weight: 600; margin: 6px 0 12px; }
+    .card-reading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    .card-value { font-family: var(--heading); font-size: 36px; line-height: 1; }
+    .card-value span { font-family: var(--body); font-size: 13px; color: var(--steel); margin-left: 4px; }
+    .trend-note { font-size: 13px; color: var(--steel); }
+    .spark { width: 120px; height: 36px; }
+    .is-hidden { display: none; }
+
+    /* ===== 9. Trend chart ===== */
+    .trend-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: baseline; }
+    .trend-svg { width: 100%; height: auto; display: block; margin-top: 12px; }
+    .trend-line { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; stroke-dasharray: var(--len); stroke-dashoffset: var(--len); transition: stroke-dashoffset 1.2s ease; }
+    .trend-line.is-drawn { stroke-dashoffset: 0; }
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--steel); margin-top: 8px; }
+
+    /* ===== 10. Tables ===== */
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--panel); }
+    caption { text-align: left; font-weight: 600; padding-bottom: 10px; }
+    .scroll-hint { display: none; font-weight: 400; color: var(--steel); }
+    th, td { border-bottom: 1px solid var(--line); padding: 12px 14px; text-align: left; vertical-align: top; }
+    thead th { background: var(--slate); color: #FFFFFF; font-weight: 600; border-bottom: 0; }
+    tbody tr:nth-child(even) td { background: #F6F8F8; }
+    .fleet tbody > tr:hover td { background: #FFF6DC; }
+    td.num { text-align: right; font-family: var(--mono); }
+    tfoot td { font-size: 13px; color: var(--steel); }
+    .row-zone-d > :first-child { padding-left: 20px; background: repeating-linear-gradient(45deg, var(--amber) 0 6px, var(--ink) 6px 12px) left / 8px 100% no-repeat, #FDECEC; }
+
+    /* ===== 11. Gauge and zone explanation ===== */
+    .gauge { position: relative; margin: 18px 0 30px; }
+    .gauge-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; }
+    .gauge-bar span { display: block; height: 100%; }
+    .gauge-labels { display: flex; font-size: 12px; color: var(--steel); margin-top: 6px; }
+    .gauge-labels span { flex: 1; }
+    .gauge-pointer.is-empty { opacity: 0; }
+    .gauge-pointer { position: absolute; top: -7px; left: 0; width: 4px; height: 28px; margin-left: -2px; background: var(--ink); border-radius: 2px; transition: left 0.5s ease; }
+    .gauge-pointer::after { content: attr(data-value); position: absolute; top: 30px; left: 50%; transform: translateX(-50%); font: 600 12px var(--mono); white-space: nowrap; }
+    .zone-list li { margin-bottom: 8px; }
+    .zone-list li::marker { font-family: var(--heading); font-weight: 700; }
+    details { border-top: 1px solid var(--line); padding: 14px 0; }
+    details:last-of-type { border-bottom: 1px solid var(--line); }
+    summary { cursor: pointer; font-weight: 600; }
+    details p { margin: 10px 0 0; color: var(--steel); }
+    .split { display: flex; flex-wrap: wrap; gap: 36px; align-items: flex-start; }
+    .split > .text { flex: 1 1 460px; }
+    .split > figure { flex: 0 1 360px; margin: 0; }
+    figcaption { font-size: 13px; color: var(--steel); margin-top: 8px; }
+
+    /* ===== 12. Form ===== */
+    form { display: flex; flex-direction: column; gap: 22px; }
+    .form-row { display: flex; flex-wrap: wrap; gap: 18px 24px; }
+    .group-title { margin: 6px 0 -8px; font-size: 13px; letter-spacing: 0.04em; color: var(--steel); font-weight: 600; }
+    .field { flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px; }
+    .field.narrow { flex: 0 1 150px; }
+    .field.full { flex-basis: 100%; }
+    label, legend { font-weight: 600; font-size: 15px; }
+    input, select, textarea { font: inherit; color: inherit; min-height: 44px; padding: 8px 12px; border: 1px solid #9AA7AD; border-radius: 4px; background: var(--panel); transition: border-color 0.2s, box-shadow 0.2s; }
+    input:hover, select:hover, textarea:hover { border-color: var(--steel); }
+    input[readonly] { background: var(--canvas); }
+    fieldset { flex: 1 1 200px; border: 1px solid var(--line); border-radius: 4px; padding: 12px 16px; margin: 0; }
+    .choice { display: flex; align-items: center; gap: 10px; min-height: 36px; font-weight: 400; }
+    .choice input { min-height: 0; width: 20px; height: 20px; }
+    .preview { background: var(--canvas); border-radius: 6px; padding: 14px 18px 4px; }
+    .preview p { margin: 0; font-size: 14px; color: var(--steel); }
+    .actions { display: flex; gap: 12px; }
+    .inline-choices { display: flex; gap: 20px; flex-wrap: wrap; }
+    .field.wide { flex: 2 1 380px; }
+    .btn { min-height: 46px; padding: 10px 22px; border-radius: 4px; font-weight: 600; transition: background-color 0.2s, transform 0.1s; }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--amber); color: var(--ink); border: 2px solid var(--ink); }
+    .btn-primary:hover { background: #FFBF1F; }
+    .btn-ghost { background: var(--panel); color: var(--ink); border: 1px solid #9AA7AD; }
+    .result { margin: 24px 0 8px; padding: 14px 18px; border-left: 6px solid var(--line); background: var(--canvas); border-radius: 4px; }
+    .result:empty { display: none; }
+    .result.zone-a, .result.zone-b { border-left-color: var(--zone-a); background: #EEF6E9; color: var(--ink); }
+    .result.zone-c { border-left-color: var(--zone-c); background: #FFF4E0; color: var(--ink); }
+    .result.zone-d { border-left-color: var(--zone-d); background: #FDECEC; color: var(--ink); }
+    .result.error { border-left-color: var(--zone-d); }
+    .result::before { display: none; }
+    #log .table-scroll { margin-top: 24px; }
+
+    /* ===== 13. Footer ===== */
+    .site-footer { margin-top: 80px; background: var(--ink); color: #C6D0D4; padding: 48px 0 32px; font-size: 14px; }
+    .footer-cols { display: flex; flex-wrap: wrap; gap: 32px; }
+    .footer-cols > div { flex: 1 1 280px; }
+    .site-footer h2 { font-size: 20px; color: #FFFFFF; }
+    .site-footer ul { padding-left: 18px; }
+    .site-footer a:link, .site-footer a:visited { color: #FFE08A; }
+    .site-footer a:hover { color: #FFFFFF; }
+
+    /* ===== 14. Responsive, motion, print ===== */
+    @media (max-width: 720px) {
+      h1 { font-size: 40px; }
+      h2 { font-size: 26px; }
+      .wrap { padding: 0 16px; }
+      .panel { padding: 20px; }
+      .clock { display: none; }
+      .site-nav { width: 100%; overflow-x: auto; }
+      .site-nav ul { flex-wrap: nowrap; white-space: nowrap; }
+      .hero-content { padding-top: 56px; }
+      .stat { flex: 1 1 calc(50% - 6px); padding: 12px 14px; }
+      .stat b { font-size: 34px; }
+      .scroll-hint { display: inline; }
+      caption { position: sticky; left: 0; max-width: calc(100vw - 74px); }
+      main > section { scroll-margin-top: 110px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .trend-line, .gauge-pointer, .card, .card-photo img { transition: none; }
+    }
+    @media print {
+      .site-header { position: static; }
+      .site-nav, .actions, .filters { display: none; }
+      .reveal { opacity: 1; transform: none; }
+    }
+    
+  </style>
+
+  <link rel="icon" type="image/png" href="./icon.png">
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <p class="brand">
+        <img src="./icon.png" width="30px">
+        Mine Equipment Health Monitor
+      </p>
+      <nav class="site-nav" aria-label="Page sections">
+        <ul>
+          <li><a href="#assets">Assets</a></li>
+          <li><a href="#trend">Trend</a></li>
+          <li><a href="#severity">Zones</a></li>
+          <li><a href="#procedure">Procedure</a></li>
+          <li><a href="#log">Log a reading</a></li>
+        </ul>
+      </nav>
+      <span class="clock" id="clock" aria-label="Local time">--:--:--</span>
+    </div>
+  </header>
+
+  <!-- ===== Hero with fleet status ===== -->
+  <section id="top" class="hero">
+    <img class="hero-img" src="./terracated.jpeg" alt="Terraced benches and haul roads spiralling down into an open-pit mine" width="1600" height="900">
+    <div class="wrap hero-content">
+      <h1>Every machine in the pit, one glance.</h1>
+      <p>Rotating equipment announces most failures weeks before it breaks, through vibration. Review the fleet, follow the trend, and log a new reading on the spot.</p>
+      <p class="site-facts">
+        North Pit, crushing and hauling area<br>
+        Day shift, 07:00 to 19:00<br>
+        Evaluated against ISO 20816-3
+      </p>
+      <div class="stats" aria-label="Fleet status">
+        <div class="stat"><b data-count="total">0</b><span>Assets monitored</span></div>
+        <div class="stat"><b data-count="healthy">0</b><span>Healthy, Zone A or B</span></div>
+        <div class="stat alert"><b data-count="alert">0</b><span>Alert, Zone C</span></div>
+        <div class="stat danger"><b data-count="danger">0</b><span>Danger, Zone D</span></div>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+
+    <div class="alarm" id="alarm" role="alert">
+      <p id="alarm-text"></p>
+      <a href="#assets">Review assets</a>
+    </div>
+
+    <!-- ===== Asset cards ===== -->
+    <section id="assets">
+      <div class="section-head reveal">
+        <div>
+          <h2>Asset health</h2>
+          <p>Latest reading per machine. Select a card to open its trend.</p>
+        </div>
+        <div class="filters" role="group" aria-label="Filter by zone">
+          <button type="button" class="chip is-active" data-filter="all">All</button>
+          <button type="button" class="chip" data-filter="A">Zone A</button>
+          <button type="button" class="chip" data-filter="B">Zone B</button>
+          <button type="button" class="chip" data-filter="C">Zone C</button>
+          <button type="button" class="chip" data-filter="D">Zone D</button>
+        </div>
+      </div>
+      <div class="asset-grid" id="asset-grid"></div>
+    </section>
+
+    <!-- ===== Trend chart ===== -->
+    <section id="trend">
+      <div class="panel reveal">
+        <div class="trend-head">
+          <h2 id="trend-title">Vibration trend</h2>
+          <p class="muted" id="trend-summary"></p>
+        </div>
+        <svg class="trend-svg" id="trend-svg" viewBox="0 0 720 280" role="img" aria-labelledby="trend-title trend-summary"></svg>
+        <div class="legend">
+          <span><span class="badge zone-a">A</span> as new</span>
+          <span><span class="badge zone-b">B</span> acceptable</span>
+          <span><span class="badge zone-c">C</span> plan remedial work</span>
+          <span><span class="badge zone-d">D</span> damage likely</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Asset register table ===== -->
+    <section id="fleet">
+      <div class="section-head reveal">
+        <div>
+          <h2>Asset register</h2>
+          <p>The weekly history in this register feeds the cards, the trend chart, and the status counters.</p>
+        </div>
+      </div>
+      <div class="table-scroll reveal">
+        <table class="fleet">
+          <caption>Latest vibration readings, North Pit<span class="scroll-hint"> Scroll sideways for all columns.</span></caption>
+          <thead>
+            <tr>
+              <th style="text-align: center; vertical-align: middle;" scope="col" rowspan="2">Area</th>
+              <th style="text-align: center; vertical-align: middle;" scope="col" rowspan="2">Equipment ID</th>
+              <th style="text-align: center; vertical-align: middle;" scope="col" rowspan="2">Zone</th>
+              <th style="text-align: center; vertical-align: middle;" scope="col" rowspan="2">Equipment</th>
+              <th style="text-align: center; vertical-align: middle;" scope="col" rowspan="2">Rated power (kW)</th>
+              <th style="text-align: center; vertical-align: middle;" scope="col" rowspan="2">Foundation</th>
+              <th style="text-align: center; vertical-align: middle;" scope="colgroup" colspan="2">Latest reading</th>
+            </tr>
+            <tr>
+              <th style="text-align: center; vertical-align: middle;" scope="col">Vibration (mm/s RMS)</th>
+              <th style="text-align: center; vertical-align: middle;" scope="col">Temperature (°C)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-id="CR-01" data-foundation="rigid" data-history="2.1 2.2 2.3 2.4 2.6 2.7 2.9 3.1" data-photo="./jaw.jpg" data-alt="Jaw crusher at a mine processing plant">
+              <th scope="rowgroup" rowspan="2">Crushing plant</th>
+              <td class="mono">CR-01</td><td class="zone"></td><td class="name">Jaw crusher drive motor</td><td class="num">250</td><td>Rigid</td>
+              <td class="num vib">3.1</td><td class="num">78</td>
+            </tr>
+            <tr data-id="CV-02" data-foundation="rigid" data-history="1.8 1.9 1.7 1.9 1.8 2.0 1.9 1.9" data-photo="./belt.jpeg" data-alt="Inclined belt conveyor carrying crushed rock">
+              <td class="mono">CV-02</td><td class="zone"></td><td class="name">Primary conveyor drive</td><td class="num">160</td><td>Rigid</td>
+              <td class="num vib">1.9</td><td class="num">61</td>
+            </tr>
+            <tr data-id="VF-01" data-foundation="rigid" data-history="2.2 2.3 2.2 2.4 2.3 2.4 2.5 2.4" data-photo="./fan.jpeg" data-alt="Large axial mine ventilation fan">
+              <th scope="rowgroup" rowspan="2">Services</th>
+              <td class="mono">VF-01</td><td class="zone"></td><td class="name">Main ventilation fan</td><td class="num">280</td><td>Rigid</td>
+              <td class="num vib">2.4</td><td class="num">66</td>
+            </tr>
+            <tr data-id="CP-01" data-foundation="flexible" data-history="3.2 3.3 3.5 3.4 3.6 3.7 3.7 3.8" data-photo="./screw.jpeg" data-alt="Packaged rotary screw air compressor">
+              <td class="mono">CP-01</td><td class="zone"></td><td class="name">Rotary screw air compressor</td><td class="num">132</td><td>Flexible</td>
+              <td class="num vib">3.8</td><td class="num">72</td>
+            </tr>
+            <tr data-id="DP-01" data-foundation="rigid" data-history="2.9 3.2 3.4 3.9 4.2 4.6 4.9 5.2" data-photo="./pump.webp" data-alt="Pump drawing water out of a flooded pit">
+              <th scope="row">Dewatering</th>
+              <td class="mono">DP-01</td><td class="zone"></td><td class="name">Dewatering pump motor</td><td class="num">110</td><td>Rigid</td>
+              <td class="num vib">5.2</td><td class="num">84</td>
+            </tr>
+            <tr data-id="HS-01" data-foundation="rigid" data-history="1.1 1.2 1.1 1.2 1.2 1.1 1.3 1.2" data-photo="./frame.jpg" data-alt="Steel headframe above a mine shaft">
+              <th scope="row">Hoisting</th>
+              <td class="mono">HS-01</td><td class="zone"></td><td class="name">Skip hoist motor</td><td class="num">300</td><td>Rigid</td>
+              <td class="num vib">1.2</td><td class="num">57</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="8">Group 2 machines (15 to 300 kW). Temperature is shown for context and is not used in the zone rule. <small>Demo data.</small></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== Severity zones ===== -->
+    <section id="severity">
+      <div class="panel split reveal">
+        <div class="text">
+          <h2>How the severity zones work</h2>
+          <p><em>Predictive maintenance</em> replaces fixed service calendars with measurement: a machine is serviced when its condition says so, before it fails.</p>
+          <p>The measured quantity is <em>RMS velocity</em>, written v<sub>RMS</sub> in millimetres per second, taken on the bearing housing in three directions. The scale below uses the limits for <mark>Group 2 machines on a rigid foundation</mark>.</p>
+          <div class="gauge" aria-hidden="true">
+            <div class="gauge-bar" id="scale-bar"></div>
+            <div class="gauge-labels" id="scale-labels"></div>
+          </div>
+          <h3>Severity zones, from best to worst</h3>
+          <ol class="zone-list" type="A">
+            <li>Newly commissioned condition: up to 1.4 mm/s.</li>
+            <li>Acceptable for unrestricted long-term operation: 1.4 to 2.8 mm/s.</li>
+            <li>Unsatisfactory for continuous operation, plan remedial work: 2.8 to 4.5 mm/s.</li>
+            <li>Likely to cause damage: above 4.5 mm/s. <strong>Report immediately. The machine is stopped and locked out under the site procedure before inspection.</strong></li>
+          </ol>
+          <details>
+            <summary>Why does the foundation type matter?</summary>
+            <p>Machines on a flexible foundation, such as the compressor on its spring skid, are allowed higher readings. The same 3.8 mm/s is Zone B for CP-01 but would be Zone C on a rigid base.</p>
+          </details>
+          <details>
+            <summary>Why flag a change inside Zone B?</summary>
+            <p>A fast rise is a warning even while the level is still acceptable. The page flags any change larger than a quarter of the B/C limit since the previous reading.</p>
+          </details>
+          <details>
+            <summary>Why is no flexibly mounted fan in the fleet?</summary>
+            <p>The standard's criteria generally apply only to fans above 300 kW or fans that are not flexibly supported, so the fan here sits on a rigid base.</p>
+          </details>
+        </div>
+        <figure>
+          <img src="./sensor-placement.svg" alt="Diagram of a sensor on the drive-end bearing housing with arrows for the vertical, horizontal, and axial measurement directions" width="360" height="300" loading="lazy">
+          <figcaption>Sensor position and measurement directions on the drive-end bearing housing.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ===== Field procedure ===== -->
+    <section id="procedure">
+      <div class="panel reveal">
+        <h2>Field procedure</h2>
+        <p>Walk the route with the handheld meter, check each machine, and follow the steps below when a reading is out of range.</p>
+        <div class="split">
+          <div class="text">
+            <h3>Inspection checklist</h3>
+            <ul>
+              <li>Bearing housing is warm, not hot, to the back of the hand.</li>
+              <li>Mounting bolts are tight and the base shows no cracks.</li>
+              <li>Coupling guard is in place and secure.</li>
+              <li>Lubrication points show fresh grease and no leakage.</li>
+              <li>Sensor cable is intact and clipped away from moving parts.</li>
+            </ul>
+          </div>
+          <div class="text">
+            <h3>When a reading falls in Zone C or D</h3>
+            <ol>
+              <li>Repeat the measurement at the same point and direction to rule out a sensor error.</li>
+              <li>Compare the value with the machine's trend above.</li>
+              <li>Record the reading and your observations in the form below.</li>
+              <li>Notify the maintenance supervisor by email.</li>
+              <li>For Zone D, wait for the supervisor's lockout before anyone opens a guard.</li>
+            </ol>
+          </div>
+        </div>
+        <p>Inspection interval for Zone C machines: <del>monthly</del> <ins>weekly</ins>, revised this quarter after two bearing failures.</p>
+      </div>
+    </section>
+
+    <!-- ===== Log a reading (form) ===== -->
+    <section id="log">
+      <div class="panel reveal">
+        <h2>Log a reading</h2>
+        <p>Enter the value shown on the handheld meter. The scale previews the zone while you type.</p>
+        <form id="reading-form" autocomplete="on">
+          <p class="group-title">Inspector and time</p>
+          <div class="form-row">
+            <div class="field">
+              <label for="inspector">Inspector name</label>
+              <input type="text" id="inspector" name="inspector" required maxlength="40" placeholder="Full name" autocomplete="name">
+            </div>
+            <div class="field">
+              <label for="email">Inspector email</label>
+              <input type="email" id="email" name="email" placeholder="name@example.com" autocomplete="email">
+            </div>
+            <div class="field">
+              <label for="date">Reading date</label>
+              <input type="date" id="date" name="date" required>
+            </div>
+            <div class="field">
+              <label for="time">Reading time</label>
+              <input type="time" id="time" name="time">
+            </div>
+          </div>
+          <p class="group-title">Machine</p>
+          <div class="form-row">
+            <div class="field">
+              <label for="equipment">Equipment</label>
+              <select id="equipment" name="equipment" required>
+                <option value="">Choose a machine</option>
+                <option value="CR-01">CR-01, jaw crusher drive motor</option>
+                <option value="CV-02">CV-02, primary conveyor drive</option>
+                <option value="VF-01">VF-01, main ventilation fan</option>
+                <option value="CP-01">CP-01, rotary screw air compressor</option>
+                <option value="DP-01">DP-01, dewatering pump motor</option>
+                <option value="HS-01">HS-01, skip hoist motor</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="direction">Measurement direction</label>
+              <select id="direction" name="direction" required>
+                <option value="">Choose a direction</option>
+                <option value="Horizontal">Horizontal</option>
+                <option value="Vertical">Vertical</option>
+                <option value="Axial">Axial</option>
+              </select>
+            </div>
+            <fieldset>
+              <legend>Foundation type</legend>
+              <div class="inline-choices">
+                <label class="choice"><input type="radio" name="foundation" value="rigid" checked> Rigid</label>
+                <label class="choice"><input type="radio" name="foundation" value="flexible"> Flexible</label>
+              </div>
+            </fieldset>
+          </div>
+          <p class="group-title">Reading</p>
+          <div class="form-row">
+            <div class="field">
+              <label for="vibration">Vibration velocity</label>
+              <input type="number" id="vibration" name="vibration" required min="0" max="20" step="0.01" placeholder="e.g. 2.35">
+            </div>
+            <div class="field narrow">
+              <label for="unit">Unit</label>
+              <input type="text" id="unit" name="unit" value="mm/s RMS" readonly>
+            </div>
+            <div class="field">
+              <label for="temperature">Bearing temperature (°C)</label>
+              <input type="number" id="temperature" name="temperature" min="-20" max="150" step="1" placeholder="e.g. 65">
+            </div>
+          </div>
+          <div class="preview" aria-live="polite">
+            <p id="preview-text">Choose a machine and enter a value to preview its zone.</p>
+            <div class="gauge">
+              <div class="gauge-bar" id="preview-bar"></div>
+              <div class="gauge-pointer is-empty" id="preview-pointer" data-value=""></div>
+            </div>
+          </div>
+          <p class="group-title">Observations</p>
+          <div class="form-row">
+            <fieldset>
+              <legend>Observed symptoms</legend>
+              <label class="choice"><input type="checkbox" name="symptom" value="Unusual noise"> Unusual noise</label>
+              <label class="choice"><input type="checkbox" name="symptom" value="Oil leak"> Oil leak</label>
+              <label class="choice"><input type="checkbox" name="symptom" value="Loose guard"> Loose guard</label>
+            </fieldset>
+            <div class="field wide">
+              <label for="notes">Field observations</label>
+              <textarea id="notes" name="notes" rows="3" maxlength="500" placeholder="What did you see, hear, or smell?"></textarea>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary">Log reading</button>
+            <button type="reset" class="btn btn-ghost">Clear form</button>
+          </div>
+        </form>
+
+        <p id="result" class="result" aria-live="polite"></p>
+
+        <div class="table-scroll">
+          <table class="log">
+            <caption>Readings logged this shift</caption>
+            <thead>
+              <tr>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Date and time</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Equipment</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Direction</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Vibration (mm/s)</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Change (mm/s)</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Zone</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Inspector</th>
+              </tr>
+            </thead>
+            <tbody id="log-body">
+              <tr id="empty-row"><td colspan="7">No readings logged yet. Use the form above to add the first one.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer class="site-footer">
+    <div class="wrap footer-cols">
+      <div>
+        <h2>References</h2>
+        <ul>
+          <li><a href="https://www.iso.org/standard/78311.html" target="_blank" rel="noopener" title="Opens in a new tab">ISO 20816-3:2022, Industrial machinery above 15 kW</a></li>
+          <li><a href="https://cs50.harvard.edu/web/notes/0/" target="_blank" rel="noopener" title="Opens in a new tab">CS50 Web Programming, Lecture 0: HTML and CSS</a></li>
+          <li><a href="https://cs50.harvard.edu/web/notes/5/" target="_blank" rel="noopener" title="Opens in a new tab">CS50 Web Programming, Lecture 5: JavaScript</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Image credits</h2>
+        <ul id="credits">
+          <li>Open-pit mine: NARA, Public Domain, Wikimedia Commons.</li>
+          <li>Jaw crusher: Maksim Safaniuk, Royalty-Free, Adobe Stock.</li>
+          <li>Belt conveyor: Fajar Kurniawan, Royalty-Free, Dreamstime.</li>
+          <li>Ventilation fan: Zitrón / International Mining, Copyright / Editorial Use.</li>
+          <li>Air compressor: Machinio, Copyright / Commercial Listing.</li>
+          <li>Dewatering pump: State Farm, Copyright / Simple Insights Editorial, statefarm.com.</li>
+          <li>Hoist headframe: James St. John, CC BY 2.0, Wikimedia Commons.</li>
+          <li>Sensor diagram and logo: original SVG.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>Contact</h2>
+        <p>
+          Maintenance supervisor<br>
+          North Pit maintenance office<br>
+          <a href="mailto:maintenance@example.com">maintenance@example.com</a>
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ===== Rules: ISO 20816-3, Group 2 (15 to 300 kW), mm/s RMS, boundaries [A/B, B/C, C/D] =====
+    const LIMITS = {
+      rigid: [1.4, 2.8, 4.5],
+      flexible: [2.3, 4.5, 7.1]
+    };
+    const MEANING = {
+      A: "newly commissioned condition.",
+      B: "acceptable for long-term operation.",
+      C: "unsatisfactory for continuous operation. Plan remedial work.",
+      D: "likely to cause damage. Report now; the machine must be locked out before inspection."
+    };
+    const ZONE_FILL = { A: "#E3EFDF", B: "#EEF5E3", C: "#FFF1DB", D: "#FBE3E3" };
+    const ZONE_BAR = { A: "#1B5E20", B: "#7CB342", C: "#E08A00", D: "#B71C1C" };
+
+    // A value on a boundary belongs to the better zone (2.8 on rigid is Zone B).
+    function classify(vibration, foundation) {
+      const limit = LIMITS[foundation];
+      if (vibration <= limit[0]) return "A";
+      if (vibration <= limit[1]) return "B";
+      if (vibration <= limit[2]) return "C";
+      return "D";
+    }
+
+    function badge(zone) {
+      const span = document.createElement("span");
+      span.className = `badge zone-${zone.toLowerCase()}`;
+      span.textContent = zone;
+      return span;
+    }
+
+    // ===== Scale helpers shared by the gauges =====
+    function scaleMax(foundation) {
+      return LIMITS[foundation][2] * 1.5;
+    }
+
+    function drawScale(bar, foundation, labels) {
+      const limit = LIMITS[foundation];
+      const max = scaleMax(foundation);
+      const edges = [0, limit[0], limit[1], limit[2], max];
+      bar.textContent = "";
+      if (labels) labels.textContent = "";
+      ["A", "B", "C", "D"].forEach((zone, i) => {
+        const part = document.createElement("span");
+        part.style.width = `${((edges[i + 1] - edges[i]) / max) * 100}%`;
+        part.style.background = ZONE_BAR[zone];
+        bar.append(part);
+        if (labels) {
+          const label = document.createElement("span");
+          label.style.flex = `0 0 ${((edges[i + 1] - edges[i]) / max) * 100}%`;
+          label.textContent = i < 3 ? `${zone} to ${edges[i + 1]}` : `${zone} above ${edges[i]}`;
+          labels.append(label);
+        }
+      });
+    }
+
+    // ===== Sparkline and trend chart (plain SVG) =====
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    function svgEl(tag, attrs) {
+      const el = document.createElementNS(SVG_NS, tag);
+      for (const key in attrs) el.setAttribute(key, attrs[key]);
+      return el;
+    }
+
+    function sparkline(values, zone) {
+      const svg = svgEl("svg", { class: "spark", viewBox: "0 0 120 36", "aria-hidden": "true" });
+      const max = Math.max(...values) * 1.1;
+      const min = Math.min(...values) * 0.9;
+      const points = values.map((v, i) => `${(i / (values.length - 1)) * 116 + 2},${34 - ((v - min) / (max - min)) * 32}`);
+      svg.append(svgEl("polyline", { points: points.join(" "), fill: "none", stroke: ZONE_BAR[zone], "stroke-width": 2 }));
+      return svg;
+    }
+
+    function drawTrend(machine) {
+      const svg = document.querySelector("#trend-svg");
+      const limit = LIMITS[machine.foundation];
+      const max = Math.max(scaleMax(machine.foundation), Math.max(...machine.history) * 1.1);
+      const left = 44, right = 700, top = 12, bottom = 236;
+      const y = v => bottom - (v / max) * (bottom - top);
+      const x = i => left + (i / (machine.history.length - 1)) * (right - left);
+      svg.textContent = "";
+      const edges = [0, limit[0], limit[1], limit[2], max];
+      ["A", "B", "C", "D"].forEach((zone, i) => {
+        svg.append(svgEl("rect", { x: left, y: y(edges[i + 1]), width: right - left, height: y(edges[i]) - y(edges[i + 1]), fill: ZONE_FILL[zone] }));
+        const tag = svgEl("text", { x: right - 6, y: y(edges[i + 1]) + 16, "text-anchor": "end", "font-size": 12, fill: "#5B6B73" });
+        tag.textContent = `Zone ${zone}`;
+        svg.append(tag);
+      });
+      limit.forEach(value => {
+        svg.append(svgEl("line", { x1: left, x2: right, y1: y(value), y2: y(value), stroke: "#5B6B73", "stroke-dasharray": "4 4" }));
+        const tick = svgEl("text", { x: left - 8, y: y(value) + 4, "text-anchor": "end", "font-size": 12, fill: "#5B6B73" });
+        tick.textContent = value;
+        svg.append(tick);
+      });
+      machine.history.forEach((v, i) => {
+        const weeksAgo = machine.history.length - 1 - i;
+        const axis = svgEl("text", { x: x(i), y: bottom + 22, "text-anchor": "middle", "font-size": 12, fill: "#5B6B73" });
+        axis.textContent = weeksAgo === 0 ? "Latest" : `${weeksAgo} wk`;
+        svg.append(axis);
+      });
+      const points = machine.history.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+      const line = svgEl("polyline", { points, class: "trend-line" });
+      svg.append(line);
+      machine.history.forEach((v, i) => {
+        svg.append(svgEl("circle", { cx: x(i), cy: y(v), r: i === machine.history.length - 1 ? 6 : 3.5, fill: ZONE_BAR[classify(v, machine.foundation)], stroke: "#FFFFFF", "stroke-width": 1.5 }));
+      });
+      const latest = machine.history[machine.history.length - 1];
+      const label = svgEl("text", { x: x(machine.history.length - 1) - 10, y: y(latest) - 12, "text-anchor": "end", "font-size": 14, "font-weight": 700, fill: "#1E272C" });
+      label.textContent = `${latest.toFixed(2)} mm/s`;
+      svg.append(label);
+      const length = line.getTotalLength();
+      line.style.setProperty("--len", length);
+      requestAnimationFrame(() => requestAnimationFrame(() => line.classList.add("is-drawn")));
+
+      const first = machine.history[0];
+      document.querySelector("#trend-title").textContent = `${machine.id} ${machine.name}`;
+      document.querySelector("#trend-summary").textContent =
+        `${machine.history.length} readings, ${first.toFixed(1)} to ${latest.toFixed(1)} mm/s, ${machine.foundation} foundation`;
+    }
+
+    // ===== Count-up for the status strip =====
+    function countUp(el, target) {
+      const start = performance.now();
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      function step(now) {
+        const progress = reduce ? 1 : Math.min((now - start) / 900, 1);
+        el.textContent = Math.round(target * (1 - Math.pow(1 - progress, 3)));
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    // Local date and time (toISOString alone would give UTC, a day behind before 08:00 in China).
+    function localStamp() {
+      const now = new Date();
+      return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.querySelector("#reading-form");
+      const result = document.querySelector("#result");
+      const logBody = document.querySelector("#log-body");
+      const grid = document.querySelector("#asset-grid");
+      const fleet = {};
+      let selectedId = "";
+
+      // 1. Read the asset register (single source of truth for every view).
+      document.querySelectorAll(".fleet tbody tr").forEach(row => {
+        const history = row.dataset.history.split(" ").map(Number);
+        fleet[row.dataset.id] = {
+          id: row.dataset.id,
+          name: row.querySelector(".name").textContent,
+          foundation: row.dataset.foundation,
+          history, row,
+          photo: row.dataset.photo, alt: row.dataset.alt
+        };
+      });
+
+      function latest(machine) {
+        return machine.history[machine.history.length - 1];
+      }
+
+      // 2. Refresh everything that depends on the fleet state.
+      function renderFleet(animate) {
+        const counts = { total: 0, healthy: 0, alert: 0, danger: 0 };
+        const warnings = [];
+        grid.textContent = "";
+        Object.values(fleet).forEach(machine => {
+          const value = latest(machine);
+          const zone = classify(value, machine.foundation);
+          counts.total += 1;
+          if (zone === "A" || zone === "B") counts.healthy += 1;
+          if (zone === "C") { counts.alert += 1; warnings.push(`${machine.id} in Zone C`); }
+          if (zone === "D") { counts.danger += 1; warnings.unshift(`${machine.id} in Zone D`); }
+
+          const cell = machine.row.querySelector(".zone");
+          cell.textContent = "";
+          cell.append(badge(zone));
+          machine.row.querySelector(".vib").textContent = value.toFixed(1);
+          machine.row.classList.toggle("row-zone-d", zone === "D");
+
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "card";
+          card.dataset.zone = zone;
+          card.dataset.id = machine.id;
+          if (zone === "D") card.classList.add("is-danger");
+          if (machine.id === selectedId) card.classList.add("is-selected");
+          const photo = document.createElement("div");
+          photo.className = "card-photo";
+          const img = document.createElement("img");
+          img.src = machine.photo;
+          img.alt = machine.alt;
+          img.loading = "lazy";
+          photo.append(img);
+          const body = document.createElement("div");
+          body.className = "card-body";
+          const topRow = document.createElement("div");
+          topRow.className = "card-top";
+          const id = document.createElement("span");
+          id.className = "mono muted";
+          id.textContent = machine.id;
+          topRow.append(id, badge(zone));
+          const name = document.createElement("p");
+          name.className = "card-name";
+          name.textContent = machine.name;
+          const reading = document.createElement("div");
+          reading.className = "card-reading";
+          const valueBox = document.createElement("div");
+          const big = document.createElement("div");
+          big.className = "card-value";
+          big.textContent = value.toFixed(1);
+          const unit = document.createElement("span");
+          unit.textContent = "mm/s";
+          big.append(unit);
+          const change = value - machine.history[machine.history.length - 2];
+          const note = document.createElement("div");
+          note.className = "trend-note";
+          note.textContent = `${change >= 0 ? "Up" : "Down"} ${Math.abs(change).toFixed(1)} since last week`;
+          valueBox.append(big, note);
+          reading.append(valueBox, sparkline(machine.history, zone));
+          body.append(topRow, name, reading);
+          card.append(photo, body);
+          card.addEventListener("click", () => selectMachine(machine.id, true, true));
+          grid.append(card);
+        });
+        applyFilter();
+
+        document.querySelectorAll("[data-count]").forEach(el => {
+          const target = counts[el.dataset.count];
+          if (animate) countUp(el, target);
+          else el.textContent = target;
+        });
+        const alarm = document.querySelector("#alarm");
+        alarm.classList.toggle("is-active", warnings.length > 0);
+        document.querySelector("#alarm-text").textContent =
+          warnings.length ? `Attention needed: ${warnings.join(", ")}.` : "";
+      }
+
+      // 3. Filter chips (show or hide cards by zone).
+      let filter = "all";
+      function applyFilter() {
+        grid.querySelectorAll(".card").forEach(card => {
+          card.classList.toggle("is-hidden", filter !== "all" && card.dataset.zone !== filter);
+        });
+      }
+      document.querySelectorAll(".chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          filter = chip.dataset.filter;
+          document.querySelectorAll(".chip").forEach(c => c.classList.toggle("is-active", c === chip));
+          applyFilter();
+        });
+      });
+
+      // 4. Selecting a machine links the card, the chart, and the form.
+      // fillForm is false on page load, so the form is never pre-filled without a user action.
+      function selectMachine(id, scroll, fillForm) {
+        selectedId = id;
+        grid.querySelectorAll(".card").forEach(card => card.classList.toggle("is-selected", card.dataset.id === id));
+        drawTrend(fleet[id]);
+        if (fillForm) {
+          form.equipment.value = id;
+          form.querySelector(`input[name="foundation"][value="${fleet[id].foundation}"]`).checked = true;
+          updatePreview();
+        }
+        if (scroll) document.querySelector("#trend").scrollIntoView();
+      }
+
+      // 5. Live zone preview while typing.
+      const previewBar = document.querySelector("#preview-bar");
+      const pointer = document.querySelector("#preview-pointer");
+      function updatePreview() {
+        const foundation = form.foundation.value;
+        drawScale(previewBar, foundation);
+        const value = parseFloat(form.vibration.value);
+        const text = document.querySelector("#preview-text");
+        if (isNaN(value)) {
+          pointer.classList.add("is-empty");
+          pointer.dataset.value = "";
+          text.textContent = "Choose a machine and enter a value to preview its zone.";
+          return;
+        }
+        const max = scaleMax(foundation);
+        pointer.classList.remove("is-empty");
+        pointer.style.left = `${Math.min(value / max, 1) * 100}%`;
+        pointer.dataset.value = value.toFixed(2);
+        text.textContent = `Preview: Zone ${classify(value, foundation)} on a ${foundation} foundation.`;
+      }
+      form.vibration.addEventListener("input", updatePreview);
+      form.querySelectorAll('input[name="foundation"]').forEach(radio => radio.addEventListener("change", updatePreview));
+      form.equipment.addEventListener("change", () => {
+        if (fleet[form.equipment.value]) selectMachine(form.equipment.value, false, true);
+      });
+
+      function setNowDefaults() {
+        const stamp = localStamp();
+        form.date.value = stamp.slice(0, 10);
+        form.time.value = stamp.slice(11, 16);
+      }
+      setNowDefaults();
+      form.addEventListener("reset", () => setTimeout(() => { setNowDefaults(); updatePreview(); }, 0));
+
+      // 6. Classify and log a reading; every view updates from the fleet state.
+      form.addEventListener("submit", event => {
+        event.preventDefault();
+        const id = form.equipment.value;
+        const vibration = Number(form.vibration.value);
+        const foundation = form.foundation.value;
+        result.className = "result";
+        if (!(vibration >= 0 && vibration <= 20)) {
+          result.classList.add("error");
+          result.textContent = "Enter a vibration value between 0 and 20 mm/s.";
+          return;
+        }
+        const zone = classify(vibration, foundation);
+        const previous = latest(fleet[id]);
+        const change = vibration - previous;
+        const bigChange = Math.abs(change) > 0.25 * LIMITS[foundation][1];
+        fleet[id].history.push(vibration);
+
+        const row = document.createElement("tr");
+        const cells = [`${form.date.value} ${form.time.value}`.trim(), id, form.direction.value,
+          vibration.toFixed(2), (change >= 0 ? "+" : "") + change.toFixed(2), null, form.inspector.value];
+        cells.forEach((value, index) => {
+          const td = document.createElement("td");
+          if (index === 3 || index === 4) td.className = "num";
+          if (value === null) td.append(badge(zone));
+          else td.textContent = value;   // textContent: typed text can never become markup
+          row.append(td);
+        });
+        if (zone === "D") row.classList.add("row-zone-d");
+        const emptyRow = document.querySelector("#empty-row");
+        if (emptyRow) emptyRow.remove();
+        logBody.prepend(row);
+
+        let message = `${id} logged at ${vibration.toFixed(2)} mm/s: Zone ${zone}, ${MEANING[zone]}`;
+        if (bigChange && zone !== "D") {
+          message += ` The change of ${change.toFixed(2)} mm/s since the previous reading is larger than a quarter of the B/C limit. Investigate the cause.`;
+        }
+        result.classList.add(`zone-${zone.toLowerCase()}`);
+        result.textContent = message;
+
+        renderFleet(false);
+        selectMachine(id, false, false);
+        // Keep who and when; clear only what changes per machine.
+        ["vibration", "temperature", "notes"].forEach(name => { form[name].value = ""; });
+        form.querySelectorAll('input[name="symptom"]').forEach(box => { box.checked = false; });
+        form.direction.value = "";
+        setNowDefaults();
+        updatePreview();
+        form.vibration.focus();
+      });
+
+      // 7. Reveal sections as they scroll into view.
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+
+      // 8. Shift clock in the header.
+      const clock = document.querySelector("#clock");
+      function tick() { clock.textContent = localStamp().slice(11, 19); }
+      tick();
+      setInterval(tick, 1000);
+
+      drawScale(document.querySelector("#scale-bar"), "rigid", document.querySelector("#scale-labels"));
+      renderFleet(true);
+      const worst = Object.values(fleet).sort((a, b) => latest(b) - latest(a))[0];
+      selectMachine(worst.id, false, false);
+      updatePreview();
+    });
+  </script>
+</body>
+</html>

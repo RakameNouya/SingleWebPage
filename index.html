@@ -4,14 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mine Equipment Health Monitor</title>
+  <link rel="icon" type="image/png" href="./icon.png">
   <style>
+    /* ===== 0. Custom font: @font-face with local WOFF files (course_9, section 27) ===== */
+    @font-face {
+      font-family: PitSans;
+      src: url("fonts/SourceSansPro-Regular.woff") format("woff");
+    }
+    @font-face {
+      font-family: PitSans;
+      src: url("fonts/SourceSansPro-Bold.woff") format("woff");
+      font-weight: bold;      /* same family name: bold text automatically uses the bold file */
+    }
+
     /* ===== 1. Tokens and base ===== */
     :root {
       --ink: #1E272C; --slate: #2E3A40; --steel: #5B6B73; --line: #D3D9DC;
       --canvas: #EEF1F2; --panel: #FFFFFF; --amber: #F2A900; --accent: #1F5F8B;
       --zone-a: #1B5E20; --zone-b: #7CB342; --zone-c: #E08A00; --zone-d: #B71C1C;
-      --heading: "Bahnschrift SemiCondensed", "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
-      --body: "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      --heading: "Bahnschrift SemiCondensed", "Bahnschrift", "DIN Alternate", PitSans, "Arial Narrow", sans-serif;
+      --body: PitSans, "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
       --mono: Consolas, "SF Mono", Menlo, monospace;
     }
     * { box-sizing: border-box; }
@@ -21,6 +33,11 @@
     h1 { font-size: 56px; }
     h2 { font-size: 30px; }
     h3 { font-size: 20px; margin-top: 24px; }
+    main h2::before {           /* decorative bar before every section title (::before) */
+      content: ""; display: inline-block; width: 10px; height: 26px; margin-right: 12px;
+      vertical-align: -3px; background: var(--amber); transform: skewX(-20deg);
+    }
+    section h2 + p { color: var(--steel); font-size: 17px; }   /* adjacent sibling combinator */
     p, li { max-width: 68ch; }
     small { font-size: 13px; color: var(--steel); }
     img { max-width: 100%; display: block; }
@@ -40,10 +57,10 @@
     .site-header::after { content: ""; display: block; height: 5px; background: repeating-linear-gradient(45deg, var(--amber) 0 12px, var(--ink) 12px 24px); }
     .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
     .brand { display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 0; font-family: var(--heading); font-size: 19px; font-weight: 600; }
-    .brand-mark { width: 30px; height: 30px; }
+    .brand-mark { width: 26px; height: 26px; }
     .site-nav ul { display: flex; gap: 4px 22px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
-    .site-nav a { display: inline-block; padding: 12px 0; color: #D5DCDF; text-decoration: none; transition: color 0.2s; }
-    .site-nav a:hover { color: var(--amber); }
+    .site-nav a { display: inline-block; padding: 12px 0; color: #D5DCDF; text-decoration: none; transition: color 0.25s ease-out, transform 0.25s ease-out; }
+    .site-nav a:hover, .site-nav a:focus { color: var(--amber); transform: translateY(-2px); }
     .site-header a:focus { outline-color: var(--amber); }
     .clock { font-family: var(--mono); font-size: 14px; color: #AEB9BE; }
 
@@ -61,11 +78,12 @@
     .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: grayscale(60%) contrast(1.55) brightness(30%); }
     .hero::before { content: ""; position: absolute; inset: 0; z-index: 1; background: rgba(20, 27, 31, 0.78); }
     .hero-content { position: relative; z-index: 2; padding: 88px 0 40px; }
-    .hero h1 { max-width: 18ch; }
+    .hero h1 { max-width: 18ch; text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.45); }
     .hero p { color: #DCE3E6; font-size: 18px; }
     .site-facts { border-left: 4px solid var(--amber); padding-left: 16px; font-size: 15px; }
-    .stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
-    .stat { flex: 1 1 200px; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; padding: 16px 18px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 36px; }
+    .stat { background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; padding: 16px 18px; transition: transform 0.3s ease, background-color 0.3s ease; }
+    .stat:hover { transform: translateY(-4px); background: rgba(255, 255, 255, 0.14); }
     .stat b { display: block; font-family: var(--heading); font-size: 44px; line-height: 1; }
     .stat span { font-size: 14px; color: #C6D0D4; }
     .stat.alert b { color: #FFB347; }
@@ -76,6 +94,7 @@
     .alarm.is-active { display: flex; }
     .alarm p { margin: 0; }
     .alarm a { margin-left: auto; font-weight: 600; white-space: nowrap; }
+    .alarm::before { content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--zone-d); animation: pulse 1.4s ease-in-out infinite; }
 
     /* ===== 7. Zone badges (shape and letter, never colour alone) ===== */
     .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 4px; font-weight: 700; font-size: 13px; background: #EEF1F2; color: var(--ink); }
@@ -92,23 +111,64 @@
     .chip { min-height: 40px; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); transition: background-color 0.2s, border-color 0.2s; }
     .chip:hover { border-color: var(--steel); }
     .chip.is-active { background: var(--ink); border-color: var(--ink); color: #FFFFFF; }
-    .asset-grid { display: flex; flex-wrap: wrap; gap: 18px; }
-    .card { flex: 1 1 320px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; text-align: left; padding: 0; color: inherit; transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s; }
-    .card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(30, 39, 44, 0.12); }
+    .asset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }   /* CSS Grid: overall content grid */
+    .asset-grid > .card--featured { grid-column: span 2; grid-row: span 2; }        /* child combinator + item spans a 2 x 2 area */
+    .card {
+      position: relative;               /* positioned ancestor of the absolute corner badge; lets "top" animate */
+      display: flex; flex-direction: column;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      overflow: hidden; text-align: left; padding: 0; color: inherit;
+      transition: all 0.4s ease;
+    }
+    .card:hover { transform: translateY(-10px) scale(1.03); box-shadow: 0 12px 20px rgba(0, 0, 0, 0.15); z-index: 10; }
     .card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
     .card.is-danger { border-color: #F1B8B8; }
     .card-photo { height: 160px; overflow: hidden; background: var(--slate); }
-    .card-photo img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(35%); transition: transform 0.5s; }
-    .card:hover .card-photo img { transform: scale(1.05); }
+    .card-photo img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(35%); transition: transform 0.4s ease; }
+    .card:hover .card-photo img { transform: scale(1.1); }                           /* descendant combinator */
+    .rank {                              /* corner badge: position absolute */
+      position: absolute; top: 14px; right: 14px; z-index: 5;
+      padding: 4px 12px; border-radius: 999px; background: rgba(30, 39, 44, 0.88); color: #FFFFFF;
+      font-size: 13px; font-weight: bold; transition: transform 0.3s ease;
+    }
+    .card--featured .rank { background: var(--amber); color: var(--ink); }
+    .card:hover .rank { transform: rotate(-6deg) scale(1.08); }
     .card-body { padding: 16px 18px 18px; }
     .card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .card-name { font-weight: 600; margin: 6px 0 12px; }
+    .card-name { font-weight: bold; margin: 6px 0 12px; word-wrap: break-word; text-shadow: 1px 1px 2px rgba(52, 152, 219, 0.3); }
     .card-reading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
     .card-value { font-family: var(--heading); font-size: 36px; line-height: 1; }
     .card-value span { font-family: var(--body); font-size: 13px; color: var(--steel); margin-left: 4px; }
     .trend-note { font-size: 13px; color: var(--steel); }
+    .card-meta { margin: 12px 0 0; font-size: 13px; color: var(--steel); }
     .spark { width: 120px; height: 36px; }
     .is-hidden { display: none; }
+
+    /* Entrance animation: every property of the course list is set explicitly */
+    .card--enter {
+      opacity: 0;
+      animation-name: fadeInUp;
+      animation-duration: 0.6s;
+      animation-timing-function: ease-out;
+      animation-fill-mode: forwards;
+    }
+    .card--enter:nth-child(1) { animation-delay: 0s; }
+    .card--enter:nth-child(2) { animation-delay: 0.1s; }
+    .card--enter:nth-child(3) { animation-delay: 0.2s; }
+    .card--enter:nth-child(4) { animation-delay: 0.3s; }
+    .card--enter:nth-child(5) { animation-delay: 0.4s; }
+    .card--enter:nth-child(6) { animation-delay: 0.5s; }
+    /* Confirmation ripple on the card whose reading was just logged */
+    .card--updated { animation-name: ripple; animation-duration: 1s; animation-timing-function: ease-out; }
+
+    /* Featured card (highest risk) only exists in the 3-column layout */
+    @media (min-width: 901px) {
+      .card--featured .card-photo { height: auto; flex: 1; min-height: 240px; }
+      .card--featured .card-body { padding: 22px 26px 26px; }
+      .card--featured .card-name { font-size: 24px; }
+      .card--featured .card-value { font-size: 56px; }
+    }
 
     /* ===== 9. Trend chart ===== */
     .trend-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: baseline; }
@@ -128,6 +188,17 @@
     .fleet tbody > tr:hover td { background: #FFF6DC; }
     td.num { text-align: right; font-family: var(--mono); }
     tfoot td { font-size: 13px; color: var(--steel); }
+    .log { table-layout: fixed; min-width: 940px; font-size: 13.5px; }      /* fixed layout: columns share the width, long text wraps inside its cell */
+    .log th, .log td { padding: 10px 8px; }
+    .log td { word-wrap: break-word; overflow-wrap: anywhere; }             /* long typed text wraps inside the cell (word-wrap) */
+    .log thead th:nth-child(1) { width: 9%; }    .log thead th:nth-child(2) { width: 8%; }
+    .log thead th:nth-child(3) { width: 8%; }    .log thead th:nth-child(4) { width: 8.5%; }
+    .log thead th:nth-child(5) { width: 7.5%; }  .log thead th:nth-child(6) { width: 9%; }
+    .log thead th:nth-child(7) { width: 7%; }    .log thead th:nth-child(8) { width: 6.5%; }
+    .log thead th:nth-child(9) { width: 10%; }   .log thead th:nth-child(10) { width: 13%; }
+    .log thead th:nth-child(11) { width: 13.5%; }
+    .log td small { display: block; font-size: 12px; color: var(--steel); }
+    .log tbody tr.is-new td { animation: rowIn 1.6s ease-out; }
     .row-zone-d > :first-child { padding-left: 20px; background: repeating-linear-gradient(45deg, var(--amber) 0 6px, var(--ink) 6px 12px) left / 8px 100% no-repeat, #FDECEC; }
 
     /* ===== 11. Gauge and zone explanation ===== */
@@ -147,7 +218,9 @@
     details p { margin: 10px 0 0; color: var(--steel); }
     .split { display: flex; flex-wrap: wrap; gap: 36px; align-items: flex-start; }
     .split > .text { flex: 1 1 460px; }
-    .split > figure { flex: 0 1 360px; margin: 0; }
+    .sensor-figure { float: right; width: 340px; margin: 0 0 20px 32px; }     /* text wraps around the figure */
+    .scale-wrap { overflow: hidden; }          /* new block formatting context: the scale stays beside the float, not under it */
+    .clearfix::after { content: ""; display: block; clear: both; }            /* clearfix: the panel encloses its float */
     figcaption { font-size: 13px; color: var(--steel); margin-top: 8px; }
 
     /* ===== 12. Form ===== */
@@ -169,7 +242,8 @@
     .actions { display: flex; gap: 12px; }
     .inline-choices { display: flex; gap: 20px; flex-wrap: wrap; }
     .field.wide { flex: 2 1 380px; }
-    .btn { min-height: 46px; padding: 10px 22px; border-radius: 4px; font-weight: 600; transition: background-color 0.2s, transform 0.1s; }
+    .btn { min-height: 46px; padding: 10px 22px; border-radius: 4px; font-weight: 600; transition: background-color 0.25s ease-out, transform 0.2s ease-out; }
+    .btn:hover, .btn:focus { transform: scale(1.05) rotate(-1deg); }
     .btn:active { transform: translateY(1px); }
     .btn-primary { background: var(--amber); color: var(--ink); border: 2px solid var(--ink); }
     .btn-primary:hover { background: #FFBF1F; }
@@ -183,6 +257,18 @@
     .result::before { display: none; }
     #log .table-scroll { margin-top: 24px; }
 
+    /* ===== 12b. Back-to-top button (position: fixed) ===== */
+    .to-top {
+      position: fixed; right: 24px; bottom: 24px; z-index: 30;
+      display: flex; align-items: center; justify-content: center; width: 52px; height: 52px;
+      border-radius: 50%; background: var(--amber); border: 2px solid var(--ink);
+      box-shadow: 0 6px 16px rgba(30, 39, 44, 0.3);
+      opacity: 0; visibility: hidden; transform: translateY(16px);
+      transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease, background-color 0.3s ease;
+    }
+    .to-top.is-shown { opacity: 1; visibility: visible; transform: translateY(0); }
+    .to-top:hover, .to-top:focus { background: #FFBF1F; transform: translateY(-4px) scale(1.1) rotate(-6deg); }
+
     /* ===== 13. Footer ===== */
     .site-footer { margin-top: 80px; background: var(--ink); color: #C6D0D4; padding: 48px 0 32px; font-size: 14px; }
     .footer-cols { display: flex; flex-wrap: wrap; gap: 32px; }
@@ -192,7 +278,22 @@
     .site-footer a:link, .site-footer a:visited { color: #FFE08A; }
     .site-footer a:hover { color: #FFFFFF; }
 
-    /* ===== 14. Responsive, motion, print ===== */
+    /* ===== 14. Keyframe animations ===== */
+    /* "top" on a position: relative card is animated instead of "transform", so the hover transform stays free
+       (an animation held by fill-mode: forwards outranks :hover for the same property) */
+    @keyframes fadeInUp { from { opacity: 0; top: 30px; } to { opacity: 1; top: 0; } }
+    @keyframes ripple { from { box-shadow: 0 0 0 0 rgba(242, 169, 0, 0.9); } to { box-shadow: 0 0 0 20px rgba(242, 169, 0, 0); } }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(183, 28, 28, 0.6); } 70% { box-shadow: 0 0 0 12px rgba(183, 28, 28, 0); } 100% { box-shadow: 0 0 0 0 rgba(183, 28, 28, 0); } }
+    @keyframes rowIn { from { background-color: #FFE8A3; } to { background-color: transparent; } }
+
+    /* ===== 15. Responsive, motion, print ===== */
+    @media (max-width: 900px) {
+      .asset-grid { grid-template-columns: repeat(2, 1fr); }
+      .asset-grid > .card--featured { grid-column: auto; grid-row: auto; }
+    }
+    @media (max-width: 620px) {
+      .asset-grid { grid-template-columns: 1fr; }
+    }
     @media (max-width: 720px) {
       h1 { font-size: 40px; }
       h2 { font-size: 26px; }
@@ -202,8 +303,11 @@
       .site-nav { width: 100%; overflow-x: auto; }
       .site-nav ul { flex-wrap: nowrap; white-space: nowrap; }
       .hero-content { padding-top: 56px; }
-      .stat { flex: 1 1 calc(50% - 6px); padding: 12px 14px; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .stat { padding: 12px 14px; }
       .stat b { font-size: 34px; }
+      .sensor-figure { float: none; width: 100%; margin: 0 0 20px; }
+      .to-top { right: 16px; bottom: 16px; }
       .scroll-hint { display: inline; }
       caption { position: sticky; left: 0; max-width: calc(100vw - 74px); }
       main > section { scroll-margin-top: 110px; }
@@ -211,17 +315,16 @@
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
       .reveal { opacity: 1; transform: none; transition: none; }
-      .trend-line, .gauge-pointer, .card, .card-photo img { transition: none; }
+      .trend-line, .gauge-pointer, .card, .card-photo img, .stat, .to-top { transition: none; }
+      .card--enter { opacity: 1; animation: none; }
+      .card--updated, .alarm::before, .log tbody tr.is-new td { animation: none; }
     }
     @media print {
       .site-header { position: static; }
       .site-nav, .actions, .filters { display: none; }
       .reveal { opacity: 1; transform: none; }
     }
-    
   </style>
-
-  <link rel="icon" type="image/png" href="./icon.png">
 </head>
 <body>
 
@@ -246,7 +349,7 @@
   </header>
 
   <!-- ===== Hero with fleet status ===== -->
-  <section id="top" class="hero">
+  <section id="overview" class="hero">
     <img class="hero-img" src="./terracated.jpeg" alt="Terraced benches and haul roads spiralling down into an open-pit mine" width="1600" height="900">
     <div class="wrap hero-content">
       <h1>Every machine in the pit, one glance.</h1>
@@ -277,7 +380,7 @@
       <div class="section-head reveal">
         <div>
           <h2>Asset health</h2>
-          <p>Latest reading per machine. Select a card to open its trend.</p>
+          <p>Ranked by risk: the machine closest to its limits comes first. Select a card to open its trend.</p>
         </div>
         <div class="filters" role="group" aria-label="Filter by zone">
           <button type="button" class="chip is-active" data-filter="all">All</button>
@@ -329,38 +432,38 @@
               <th style="text-align: center; vertical-align: middle;" scope="colgroup" colspan="2">Latest reading</th>
             </tr>
             <tr>
-              <th style="text-align: center; vertical-align: middle;" scope="col">Vibration (mm/s RMS)</th>
-              <th style="text-align: center; vertical-align: middle;" scope="col">Temperature (°C)</th>
+              <th scope="col">Vibration (mm/s RMS)</th>
+              <th scope="col">Temperature (°C)</th>
             </tr>
           </thead>
           <tbody>
             <tr data-id="CR-01" data-foundation="rigid" data-history="2.1 2.2 2.3 2.4 2.6 2.7 2.9 3.1" data-photo="./jaw.jpg" data-alt="Jaw crusher at a mine processing plant">
               <th scope="rowgroup" rowspan="2">Crushing plant</th>
               <td class="mono">CR-01</td><td class="zone"></td><td class="name">Jaw crusher drive motor</td><td class="num">250</td><td>Rigid</td>
-              <td class="num vib">3.1</td><td class="num">78</td>
+              <td class="num vib">3.1</td><td class="num temp">78</td>
             </tr>
             <tr data-id="CV-02" data-foundation="rigid" data-history="1.8 1.9 1.7 1.9 1.8 2.0 1.9 1.9" data-photo="./belt.jpeg" data-alt="Inclined belt conveyor carrying crushed rock">
               <td class="mono">CV-02</td><td class="zone"></td><td class="name">Primary conveyor drive</td><td class="num">160</td><td>Rigid</td>
-              <td class="num vib">1.9</td><td class="num">61</td>
+              <td class="num vib">1.9</td><td class="num temp">61</td>
             </tr>
             <tr data-id="VF-01" data-foundation="rigid" data-history="2.2 2.3 2.2 2.4 2.3 2.4 2.5 2.4" data-photo="./fan.jpeg" data-alt="Large axial mine ventilation fan">
               <th scope="rowgroup" rowspan="2">Services</th>
               <td class="mono">VF-01</td><td class="zone"></td><td class="name">Main ventilation fan</td><td class="num">280</td><td>Rigid</td>
-              <td class="num vib">2.4</td><td class="num">66</td>
+              <td class="num vib">2.4</td><td class="num temp">66</td>
             </tr>
             <tr data-id="CP-01" data-foundation="flexible" data-history="3.2 3.3 3.5 3.4 3.6 3.7 3.7 3.8" data-photo="./screw.jpeg" data-alt="Packaged rotary screw air compressor">
               <td class="mono">CP-01</td><td class="zone"></td><td class="name">Rotary screw air compressor</td><td class="num">132</td><td>Flexible</td>
-              <td class="num vib">3.8</td><td class="num">72</td>
+              <td class="num vib">3.8</td><td class="num temp">72</td>
             </tr>
             <tr data-id="DP-01" data-foundation="rigid" data-history="2.9 3.2 3.4 3.9 4.2 4.6 4.9 5.2" data-photo="./pump.webp" data-alt="Pump drawing water out of a flooded pit">
               <th scope="row">Dewatering</th>
               <td class="mono">DP-01</td><td class="zone"></td><td class="name">Dewatering pump motor</td><td class="num">110</td><td>Rigid</td>
-              <td class="num vib">5.2</td><td class="num">84</td>
+              <td class="num vib">5.2</td><td class="num temp">84</td>
             </tr>
             <tr data-id="HS-01" data-foundation="rigid" data-history="1.1 1.2 1.1 1.2 1.2 1.1 1.3 1.2" data-photo="./frame.jpg" data-alt="Steel headframe above a mine shaft">
               <th scope="row">Hoisting</th>
               <td class="mono">HS-01</td><td class="zone"></td><td class="name">Skip hoist motor</td><td class="num">300</td><td>Rigid</td>
-              <td class="num vib">1.2</td><td class="num">57</td>
+              <td class="num vib">1.2</td><td class="num temp">57</td>
             </tr>
           </tbody>
           <tfoot>
@@ -374,39 +477,37 @@
 
     <!-- ===== Severity zones ===== -->
     <section id="severity">
-      <div class="panel split reveal">
-        <div class="text">
-          <h2>How the severity zones work</h2>
-          <p><em>Predictive maintenance</em> replaces fixed service calendars with measurement: a machine is serviced when its condition says so, before it fails.</p>
-          <p>The measured quantity is <em>RMS velocity</em>, written v<sub>RMS</sub> in millimetres per second, taken on the bearing housing in three directions. The scale below uses the limits for <mark>Group 2 machines on a rigid foundation</mark>.</p>
-          <div class="gauge" aria-hidden="true">
-            <div class="gauge-bar" id="scale-bar"></div>
-            <div class="gauge-labels" id="scale-labels"></div>
-          </div>
-          <h3>Severity zones, from best to worst</h3>
-          <ol class="zone-list" type="A">
-            <li>Newly commissioned condition: up to 1.4 mm/s.</li>
-            <li>Acceptable for unrestricted long-term operation: 1.4 to 2.8 mm/s.</li>
-            <li>Unsatisfactory for continuous operation, plan remedial work: 2.8 to 4.5 mm/s.</li>
-            <li>Likely to cause damage: above 4.5 mm/s. <strong>Report immediately. The machine is stopped and locked out under the site procedure before inspection.</strong></li>
-          </ol>
-          <details>
-            <summary>Why does the foundation type matter?</summary>
-            <p>Machines on a flexible foundation, such as the compressor on its spring skid, are allowed higher readings. The same 3.8 mm/s is Zone B for CP-01 but would be Zone C on a rigid base.</p>
-          </details>
-          <details>
-            <summary>Why flag a change inside Zone B?</summary>
-            <p>A fast rise is a warning even while the level is still acceptable. The page flags any change larger than a quarter of the B/C limit since the previous reading.</p>
-          </details>
-          <details>
-            <summary>Why is no flexibly mounted fan in the fleet?</summary>
-            <p>The standard's criteria generally apply only to fans above 300 kW or fans that are not flexibly supported, so the fan here sits on a rigid base.</p>
-          </details>
-        </div>
-        <figure>
+      <div class="panel clearfix reveal">
+        <h2>How the severity zones work</h2>
+        <figure class="sensor-figure">
           <img src="./sensor-placement.svg" alt="Diagram of a sensor on the drive-end bearing housing with arrows for the vertical, horizontal, and axial measurement directions" width="360" height="300" loading="lazy">
           <figcaption>Sensor position and measurement directions on the drive-end bearing housing.</figcaption>
         </figure>
+        <p><em>Predictive maintenance</em> replaces fixed service calendars with measurement: a machine is serviced when its condition says so, before it fails.</p>
+        <p>The measured quantity is <em>RMS velocity</em>, written v<sub>RMS</sub> in millimetres per second, taken on the bearing housing in three directions. The scale below uses the limits for <mark>Group 2 machines on a rigid foundation</mark>.</p>
+        <div class="gauge scale-wrap" aria-hidden="true">
+          <div class="gauge-bar" id="scale-bar"></div>
+          <div class="gauge-labels" id="scale-labels"></div>
+        </div>
+        <h3>Severity zones, from best to worst</h3>
+        <ol class="zone-list" type="A">
+          <li>Newly commissioned condition: up to 1.4 mm/s.</li>
+          <li>Acceptable for unrestricted long-term operation: 1.4 to 2.8 mm/s.</li>
+          <li>Unsatisfactory for continuous operation, plan remedial work: 2.8 to 4.5 mm/s.</li>
+          <li>Likely to cause damage: above 4.5 mm/s. <strong>Report immediately. The machine is stopped and locked out under the site procedure before inspection.</strong></li>
+        </ol>
+        <details>
+          <summary>Why does the foundation type matter?</summary>
+          <p>Machines on a flexible foundation, such as the compressor on its spring skid, are allowed higher readings. The same 3.8 mm/s is Zone B for CP-01 but would be Zone C on a rigid base.</p>
+        </details>
+        <details>
+          <summary>Why flag a change inside Zone B?</summary>
+          <p>A fast rise is a warning even while the level is still acceptable. The page flags any change larger than a quarter of the B/C limit since the previous reading.</p>
+        </details>
+        <details>
+          <summary>Why is no flexibly mounted fan in the fleet?</summary>
+          <p>The standard's criteria generally apply only to fans above 300 kW or fans that are not flexibly supported, so the fan here sits on a rigid base.</p>
+        </details>
       </div>
     </section>
 
@@ -542,20 +643,24 @@
 
         <div class="table-scroll">
           <table class="log">
-            <caption>Readings logged this shift</caption>
+            <caption>Readings logged this shift: every field of the form is shown<span class="scroll-hint"> Scroll sideways for all columns.</span></caption>
             <thead>
               <tr>
                 <th style="text-align: center; vertical-align: middle;" scope="col">Date and time</th>
                 <th style="text-align: center; vertical-align: middle;" scope="col">Equipment</th>
                 <th style="text-align: center; vertical-align: middle;" scope="col">Direction</th>
-                <th style="text-align: center; vertical-align: middle;" scope="col">Vibration (mm/s)</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Foundation</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Vibration (mm/s RMS)</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Temperature (°C)</th>
                 <th style="text-align: center; vertical-align: middle;" scope="col">Change (mm/s)</th>
                 <th style="text-align: center; vertical-align: middle;" scope="col">Zone</th>
-                <th style="text-align: center; vertical-align: middle;" scope="col">Inspector</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Symptoms</th>
+                <th style="text-align: center; vertical-align: middle;" scope="col">Field observations</th>
+                <th style="text-align: center; vertical-align: middle;" fscope="col">Inspector</th>
               </tr>
             </thead>
             <tbody id="log-body">
-              <tr id="empty-row"><td colspan="7">No readings logged yet. Use the form above to add the first one.</td></tr>
+              <tr id="empty-row"><td colspan="11">No readings logged yet. Use the form above to add the first one.</td></tr>
             </tbody>
           </table>
         </div>
@@ -575,7 +680,7 @@
         </ul>
       </div>
       <div>
-        <h2>Image credits</h2>
+        <h2>Image and font credits</h2>
         <ul id="credits">
           <li>Open-pit mine: NARA, Public Domain, Wikimedia Commons.</li>
           <li>Jaw crusher: Maksim Safaniuk, Royalty-Free, Adobe Stock.</li>
@@ -585,6 +690,7 @@
           <li>Dewatering pump: State Farm, Copyright / Simple Insights Editorial, statefarm.com.</li>
           <li>Hoist headframe: James St. John, CC BY 2.0, Wikimedia Commons.</li>
           <li>Sensor diagram and logo: original SVG.</li>
+          <li>Typeface: Source Sans Pro, Adobe, SIL Open Font License 1.1 (licence file in the fonts folder).</li>
         </ul>
       </div>
       <div>
@@ -597,6 +703,10 @@
       </div>
     </div>
   </footer>
+
+  <a class="to-top" id="to-top" href="#top" aria-label="Back to top">
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="#1E272C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
 
   <script>
     // ===== Rules: ISO 20816-3, Group 2 (15 to 300 kW), mm/s RMS, boundaries [A/B, B/C, C/D] =====
@@ -752,6 +862,7 @@
           name: row.querySelector(".name").textContent,
           foundation: row.dataset.foundation,
           history, row,
+          temperature: Number(row.querySelector(".temp").textContent),
           photo: row.dataset.photo, alt: row.dataset.alt
         };
       });
@@ -760,12 +871,23 @@
         return machine.history[machine.history.length - 1];
       }
 
+      // Risk score: latest reading divided by the machine's own B/C limit, so rigid and flexible machines compare fairly.
+      function riskScore(machine) {
+        return latest(machine) / LIMITS[machine.foundation][1];
+      }
+
+      function capitalize(word) {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }
+
       // 2. Refresh everything that depends on the fleet state.
-      function renderFleet(animate) {
+      // animate: first render only (entrance animation). updatedId: card that gets the confirmation ripple.
+      function renderFleet(animate, updatedId) {
         const counts = { total: 0, healthy: 0, alert: 0, danger: 0 };
         const warnings = [];
         grid.textContent = "";
-        Object.values(fleet).forEach(machine => {
+        const ranked = Object.values(fleet).sort((a, b) => riskScore(b) - riskScore(a));
+        ranked.forEach((machine, position) => {
           const value = latest(machine);
           const zone = classify(value, machine.foundation);
           counts.total += 1;
@@ -777,6 +899,7 @@
           cell.textContent = "";
           cell.append(badge(zone));
           machine.row.querySelector(".vib").textContent = value.toFixed(1);
+          machine.row.querySelector(".temp").textContent = machine.temperature;
           machine.row.classList.toggle("row-zone-d", zone === "D");
 
           const card = document.createElement("button");
@@ -786,6 +909,8 @@
           card.dataset.id = machine.id;
           if (zone === "D") card.classList.add("is-danger");
           if (machine.id === selectedId) card.classList.add("is-selected");
+          if (animate) card.classList.add("card--enter");
+          if (machine.id === updatedId) card.classList.add("card--updated");
           const photo = document.createElement("div");
           photo.className = "card-photo";
           const img = document.createElement("img");
@@ -819,8 +944,14 @@
           note.textContent = `${change >= 0 ? "Up" : "Down"} ${Math.abs(change).toFixed(1)} since last week`;
           valueBox.append(big, note);
           reading.append(valueBox, sparkline(machine.history, zone));
-          body.append(topRow, name, reading);
-          card.append(photo, body);
+          const meta = document.createElement("p");
+          meta.className = "card-meta";
+          meta.textContent = `Bearing ${machine.temperature} °C, ${machine.foundation} foundation`;
+          body.append(topRow, name, reading, meta);
+          const rank = document.createElement("span");
+          rank.className = "rank";
+          rank.textContent = `Priority ${position + 1}`;
+          card.append(photo, rank, body);
           card.addEventListener("click", () => selectMachine(machine.id, true, true));
           grid.append(card);
         });
@@ -840,8 +971,9 @@
       // 3. Filter chips (show or hide cards by zone).
       let filter = "all";
       function applyFilter() {
-        grid.querySelectorAll(".card").forEach(card => {
+        grid.querySelectorAll(".card").forEach((card, index) => {
           card.classList.toggle("is-hidden", filter !== "all" && card.dataset.zone !== filter);
+          card.classList.toggle("card--featured", filter === "all" && index === 0);   // highest risk, only in the full view
         });
       }
       document.querySelectorAll(".chip").forEach(chip => {
@@ -918,17 +1050,43 @@
         const bigChange = Math.abs(change) > 0.25 * LIMITS[foundation][1];
         fleet[id].history.push(vibration);
 
+        // Collect every field of the form so that nothing typed is lost.
+        const symptoms = [];
+        form.querySelectorAll('input[name="symptom"]:checked').forEach(box => symptoms.push(box.value));
+        const registered = fleet[id].foundation;
+        const temperature = form.temperature.value === "" ? "" : String(Number(form.temperature.value));
+        if (temperature !== "") fleet[id].temperature = Number(temperature);
+        const notes = form.notes.value.trim();
+        const email = form.email.value.trim();
+
         const row = document.createElement("tr");
-        const cells = [`${form.date.value} ${form.time.value}`.trim(), id, form.direction.value,
-          vibration.toFixed(2), (change >= 0 ? "+" : "") + change.toFixed(2), null, form.inspector.value];
-        cells.forEach((value, index) => {
+        const cells = [
+          { text: `${form.date.value} ${form.time.value}`.trim() },
+          { text: id, className: "mono" },
+          { text: form.direction.value },
+          { text: capitalize(foundation), sub: foundation !== registered ? `Register: ${capitalize(registered)}` : "" },
+          { text: vibration.toFixed(2), className: "num" },
+          { text: temperature === "" ? "-" : temperature, className: "num" },
+          { text: (change >= 0 ? "+" : "") + change.toFixed(2), className: "num" },
+          { zone: zone },
+          { text: symptoms.length ? symptoms.join(", ") : "None", className: "symptoms" },
+          { text: notes === "" ? "-" : notes, className: "notes" },
+          { text: form.inspector.value, sub: email, className: "person" }
+        ];
+        cells.forEach(spec => {
           const td = document.createElement("td");
-          if (index === 3 || index === 4) td.className = "num";
-          if (value === null) td.append(badge(zone));
-          else td.textContent = value;   // textContent: typed text can never become markup
+          if (spec.className) td.className = spec.className;
+          if (spec.zone) td.append(badge(spec.zone));
+          else td.textContent = spec.text;     // textContent: typed text can never become markup
+          if (spec.sub) {
+            const small = document.createElement("small");
+            small.textContent = spec.sub;
+            td.append(small);
+          }
           row.append(td);
         });
         if (zone === "D") row.classList.add("row-zone-d");
+        row.classList.add("is-new");
         const emptyRow = document.querySelector("#empty-row");
         if (emptyRow) emptyRow.remove();
         logBody.prepend(row);
@@ -937,10 +1095,13 @@
         if (bigChange && zone !== "D") {
           message += ` The change of ${change.toFixed(2)} mm/s since the previous reading is larger than a quarter of the B/C limit. Investigate the cause.`;
         }
+        if (foundation !== registered) {
+          message += ` Note: the register lists a ${registered} foundation for ${id}; the cards and the trend use the register value.`;
+        }
         result.classList.add(`zone-${zone.toLowerCase()}`);
         result.textContent = message;
 
-        renderFleet(false);
+        renderFleet(false, id);
         selectMachine(id, false, false);
         // Keep who and when; clear only what changes per machine.
         ["vibration", "temperature", "notes"].forEach(name => { form[name].value = ""; });
@@ -964,13 +1125,19 @@
 
       // 8. Shift clock in the header.
       const clock = document.querySelector("#clock");
-      function tick() { clock.textContent = localStamp().slice(11, 19); }
+      function tick() { clock.textContent = new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Shanghai", hour12:false}); }
       tick();
       setInterval(tick, 1000);
 
+      // 9. Back-to-top button appears after the first screen has been scrolled.
+      const toTop = document.querySelector("#to-top");
+      window.addEventListener("scroll", () => {
+        toTop.classList.toggle("is-shown", window.scrollY > 480);
+      });
+
       drawScale(document.querySelector("#scale-bar"), "rigid", document.querySelector("#scale-labels"));
-      renderFleet(true);
-      const worst = Object.values(fleet).sort((a, b) => latest(b) - latest(a))[0];
+      renderFleet(true, "");
+      const worst = Object.values(fleet).sort((a, b) => riskScore(b) - riskScore(a))[0];
       selectMachine(worst.id, false, false);
       updatePreview();
     });
